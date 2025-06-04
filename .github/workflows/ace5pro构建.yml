@@ -82,8 +82,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-         sudo apt update && sudo apt upgrade -y
-         sudo apt install -y python3 git curl
+          sudo apt update && sudo apt upgrade -y
+          sudo apt install -y python3 git curl ccache libelf-dev
 
       - name: Install repo tool
         run: |
