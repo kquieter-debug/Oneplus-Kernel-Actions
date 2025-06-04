@@ -76,7 +76,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt upgrade -y
-          sudo apt install -y python3 git curl ccache libelf-dev
+          sudo apt install -y python3 git curl ccache
 
       - name: Install repo tool
         run: |
@@ -127,7 +127,7 @@ jobs:
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
 
           cd kernel_platform        
-          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch ./common/
+          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           #lz4k
@@ -137,10 +137,10 @@ jobs:
           cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./common/lib/
           cd ./common
 
-          sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch
-          sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch
+          sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-android15-6.6.patch
+          sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-android15-6.6.patch
 
-          patch -p1 < 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch || true
+          patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || true
           cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
           patch -p1 -F 3 < syscall_hooks.patch
           echo "完成"
@@ -282,7 +282,7 @@ jobs:
         run: |
           cd kernel_workspace/kernel_platform
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
-          sudo sed -i 's/-4k/${{ github.event.inputs.KERNEL_NAME }}/g' ./common/arch/arm64/configs/gki_defconfig
+          sudo sed -i 's/-4k/${{ github.event.inputs.KERNEL_SUFFIX }}/g' ./common/arch/arm64/configs/gki_defconfig
 
       - name: Add sched_ext
         if: ${{ inputs.enable_feature_z }}
@@ -333,13 +333,13 @@ jobs:
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-         name: SuKiSu_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+         name: SuKiSu_${{ env.KSUVER }}_oneplus_13t
          path: ./AnyKernel3/*
          
       - name: Upload Image
         uses: actions/upload-artifact@v4
         with:
-          name: Image_SuKiSu_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+          name: Image_SuKiSu_${{ env.KSUVER }}_oneplus_13t
           path: kernel_workspace/kernel_platform/dist/Image
       - name: Generate Release Description
         run: |
@@ -379,15 +379,15 @@ jobs:
 
       - name: Zip AnyKernel3
         run: |
-          zip -r SuKiSu_${KSUVER}_${{ github.event.inputs.FEIL }}_${{ steps.formatted_date.outputs.formatted }}.zip AnyKernel3
+          zip -r SuKiSu_${KSUVER}_oneplus_13t_${{ steps.formatted_date.outputs.formatted }}.zip AnyKernel3
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'workflow_dispatch'
         with:
-          tag_name: SuKiSu_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}_${{ steps.formatted_date.outputs.formatted }}
+          tag_name: SuKiSu_${{ env.KSUVER }}_oneplus_13t_${{ steps.formatted_date.outputs.formatted }}
           name: onplus13t构建 sukisu${{ env.KSUVER }}版本
           body: ${{ env.RELEASE_BODY }}
-          files: SuKiSu_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}_${{ steps.formatted_date.outputs.formatted }}.zip
+          files: SuKiSu_${{ env.KSUVER }}_oneplus_13t_${{ steps.formatted_date.outputs.formatted }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
