@@ -1,5 +1,5 @@
 name: 一加ace5pro构建 
- on:
+on:
   workflow_dispatch:
     inputs:
       KERNEL_SUFFIX:
@@ -15,7 +15,7 @@ name: 一加ace5pro构建
           - 自动获取
           - 自定义
       KERNEL_TIME_CUSTOM:
-        description: "自定义编译时间（仅在自定义模式下生效，如 2025-06-04 12:00:00 CST）"
+        description: "自定义编译时间(仅在自定义模式下生效，如 2025-06-04 12:00:00 CST)"
         required: false
         default: ''
       enable_feature_x:
