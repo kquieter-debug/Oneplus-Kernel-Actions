@@ -98,25 +98,6 @@ jobs:
          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
          export KSU_VERSION=$KSU_VERSION
          sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
-      - name: Analyze functional options
-        id: parse_features
-        run: |
-          features="${{ github.event.inputs.FEATURES }}"
-          if [[ "$features" == *kpm* ]]; then
-            echo "ENABLE_KPM=true" >> $GITHUB_ENV
-          else
-            echo "ENABLE_KPM=false" >> $GITHUB_ENV
-          fi
-          if [[ "$features" == *lz4kd* ]]; then
-            echo "ENABLE_LZ4KD=true" >> $GITHUB_ENV
-          else
-            echo "ENABLE_LZ4KD=false" >> $GITHUB_ENV
-          fi
-          if [[ "$features" == *fengchi* ]]; then
-            echo "ENABLE_FENGCHI=true" >> $GITHUB_ENV
-          else
-            echo "ENABLE_FENGCHI=false" >> $GITHUB_ENV
-          fi
       - name: Set up susfs
         run: |
           cd kernel_workspace
@@ -124,7 +105,7 @@ jobs:
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
 
           cd kernel_platform        
-          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch ./common/
+          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           #lz4k
@@ -134,10 +115,10 @@ jobs:
           cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./common/lib/
           cd ./common
 
-          sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch
-          sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch
+          sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-android15-6.6.patch
+          sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-android15-6.6.patch
 
-          patch -p1 < 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch || true
+          patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || true
           cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
           patch -p1 -F 3 < syscall_hooks.patch
           echo "完成"
@@ -225,8 +206,8 @@ jobs:
         if: ${{ inputs.enable_feature_y }}
         run: |
           cd kernel_workspace/kernel_platform/common
-            cp ../../SukiSU_patch/other/zram/zram_patch/${{ github.event.inputs.KERNEL_VERSION }}/lz4kd.patch ./
-            patch -p1 -F 3 < lz4kd.patch || true
+          cp ../../SukiSU_patch/other/zram/zram_patch/6.6/lz4kd.patch ./
+          patch -p1 -F 3 < lz4kd.patch || true
            
       - name: Add SUSFS Configuration Settings
         run: |
@@ -279,7 +260,7 @@ jobs:
         run: |
           cd kernel_workspace/kernel_platform
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
-          sudo sed -i 's/-4k/${{ github.event.inputs.KERNEL_NAME }}/g' ./common/arch/arm64/configs/gki_defconfig
+          sudo sed -i 's/-4k/${{ inputs.KERNEL_SUFFIX }}/g' ./common/arch/arm64/configs/gki_defconfig
 
       - name: Add sched_ext
         if: ${{ inputs.enable_feature_z }}
@@ -292,10 +273,10 @@ jobs:
          
       - name: Set the kernel compilation time
         run: |
-          if [ "${{ github.event.inputs.KERNEL_TIME_MODE }}" = "自动获取" ]; then
+          if [ "${{ inputs.KERNEL_TIME_MODE }}" = "自动获取" ]; then
             echo "KERNEL_TIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S CST')" >> $GITHUB_ENV
           else
-            echo "KERNEL_TIME=${{ github.event.inputs.KERNEL_TIME_CUSTOM }}" >> $GITHUB_ENV
+            echo "KERNEL_TIME=${{ inputs.KERNEL_TIME_CUSTOM }}" >> $GITHUB_ENV
           fi
       - name: Set Kernel build timestamp
         run: |
@@ -330,44 +311,46 @@ jobs:
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-         name: SuKiSu_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+         name: SuKiSu_${{ env.KSUVER }}_oneplus_13
          path: ./AnyKernel3/*
-         
+
       - name: Upload Image
         uses: actions/upload-artifact@v4
         with:
-         name: Image_SuKiSu_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+         name: Image_SuKiSu_${{ env.KSUVER }}_oneplus_13
          path: kernel_workspace/kernel_platform/dist/Image
+
       - name: Generate Release Description
         run: |
-          if [[ "$ENABLE_KPM" == "true" ]]; then
+          if [[ "${{ inputs.enable_feature_x }}" == "true" ]]; then
             kpm="已嵌入"
           else
             kpm="未嵌入"
           fi
-          if [[ "$ENABLE_LZ4KD" == "true" ]]; then
+          if [[ "${{ inputs.enable_feature_y }}" == "true" ]]; then
             lz4kd="已嵌入"
           else
             lz4kd="未嵌入"
           fi
-          if [[ "$ENABLE_FENGCHI" == "true" ]]; then
+          if [[ "${{ inputs.enable_feature_z }}" == "true" ]]; then
             fengchi="已嵌入"
           else
             fengchi="未嵌入"
           fi
-            susfs="已嵌入"
-            FEIL="oneplus_13"
-            desc="**SuKiSu 版本**: $KSUVER
-                **内核型号**: $FEIL
-                **KPM**: $kpm
-                **LZ4KD**: $lz4kd
-                **风驰内核**: $fengchi
-                **SUSFS**: $susfs
-                **构建时间**: $KERNEL_TIME
-                **构建者**: 酷安by姜北尘"
-            echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
-            echo "$desc" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+          susfs="已嵌入"
+          FEIL="oneplus_13"
+          desc="**SuKiSu 版本**: $KSUVER
+              **内核型号**: $FEIL
+              **KPM**: $kpm
+              **LZ4KD**: $lz4kd
+              **风驰内核**: $fengchi
+              **SUSFS**: $susfs
+              **构建时间**: $KERNEL_TIME
+              **构建者**: 酷安by姜北尘"
+          echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+          echo "$desc" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
       - name: Get formatted date
         id: formatted_date
         run: |
@@ -376,15 +359,15 @@ jobs:
 
       - name: Zip AnyKernel3
         run: |
-          zip -r SuKiSu_${KSUVER}_${{ github.event.inputs.FEIL }}_${{ steps.formatted_date.outputs.formatted }}.zip AnyKernel3
+          zip -r SuKiSu_${KSUVER}_oneplus_13_${{ steps.formatted_date.outputs.formatted }}.zip AnyKernel3
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'workflow_dispatch'
         with:
-          tag_name: SuKiSu_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}_${{ steps.formatted_date.outputs.formatted }}
+          tag_name: SuKiSu_${{ env.KSUVER }}_oneplus_13_${{ steps.formatted_date.outputs.formatted }}
           name: onplus13构建 sukisu${{ env.KSUVER }}版本
           body: ${{ env.RELEASE_BODY }}
-          files: SuKiSu_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}_${{ steps.formatted_date.outputs.formatted }}.zip
+          files: SuKiSu_${{ env.KSUVER }}_oneplus_13_${{ steps.formatted_date.outputs.formatted }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
