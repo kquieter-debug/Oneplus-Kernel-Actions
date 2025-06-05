@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       KERNEL_SUFFIX:
-        description: '内核名称修改(可改中文和emoji)'
+        description: '内核名称修改'
         required: true
         default: '-酷安姜北尘'
       KERNEL_TIME_MODE:
