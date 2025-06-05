@@ -296,14 +296,14 @@ jobs:
           cd kernel_workspace/kernel_platform/common
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld  HOSTLD=ld.lld O=out  gki_defconfig all
 
-      - name: Patch Kernel Image
+      - name: Apply Linux Patch
         run: |
-         cd kernel_workspace/kernel_platform/dist/
-         curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.11-beta/patch_linux
-         chmod +x patch_linux
-         ./patch_linux
-         rm -f Image
-         mv oImage Image
+          cd kernel_workspace/kernel_platform/dist
+          curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.11-beta/patch_linux
+          chmod +x patch_linux
+          ./patch_linux
+          rm -f Image
+          mv oImage Image
 
       - name: Prepare AnyKernel3
         run: |
@@ -325,17 +325,17 @@ jobs:
           path: kernel_workspace/kernel_platform/dist/Image
       - name: Generate Release Description
         run: |
-          if ${{ inputs.enable_feature_x }}; then
+          if [ "${{ inputs.enable_feature_x }}" = "true" ]; then
             kpm="已嵌入"
           else
             kpm="未嵌入"
           fi
-          if ${{ inputs.enable_feature_y }}; then
+          if [ "${{ inputs.enable_feature_y }}" = "true" ]; then
             lz4kd="已嵌入"
           else
             lz4kd="未嵌入"
           fi
-          if ${{ inputs.enable_feature_z }}; then
+          if [ "${{ inputs.enable_feature_z }}" = "true" ]; then
             fengchi="已嵌入"
           else
             fengchi="未嵌入"
