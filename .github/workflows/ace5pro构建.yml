@@ -281,19 +281,14 @@ jobs:
             echo "KERNEL_TIME=${{ inputs.KERNEL_TIME_CUSTOM }}" >> $GITHUB_ENV
           fi
          
-      - name: Set Kernel build timestamp
-        run: |
-          export SOURCE_DATE_EPOCH=$(date -d "${{ env.KERNEL_TIME }}" +%s)
-          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >> $GITHUB_ENV
-
       - name: Build Kernel
         run: |
           export KBUILD_BUILD_TIMESTAMP="${{ env.KERNEL_TIME }}"
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
           export PATH="/usr/lib/ccache:$PATH"
-          sudo apt install -y libelf-dev
+          sudo apt install libelf-dev
           cd kernel_workspace/kernel_platform/common
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig all
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld  HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig all
 
       - name: Apply Linux Patch
         run: |
