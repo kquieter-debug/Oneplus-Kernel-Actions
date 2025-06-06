@@ -6,18 +6,10 @@ on:
         description: '内核名称修改'
         required: true
         default: '-酷安姜北尘'
-      KERNEL_TIME_MODE:
-        description: "编译时间模式（自动获取/自定义）"
+      KERNEL_TIME:
+        description: "内核构建日期更改(默认为原厂)"
         required: true
-        default: '自动获取'
-        type: choice
-        options:
-          - 自动获取
-          - 自定义
-      KERNEL_TIME_CUSTOM:
-        description: "自定义编译时间(仅在自定义模式下生效，如 2025-06-04 12:00:00 CST)"
-        required: false
-        default: ''
+        default: 'Tue Dec 17 23:36:49 UTC 2024'
       enable_feature_x:
         description: "是否启用kpm"
         required: false
@@ -111,7 +103,7 @@ jobs:
           cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-          #lz4k
+          # lz4k
           cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux
           cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
           cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto
@@ -124,6 +116,7 @@ jobs:
           patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch
           if [ $? -ne 0 ]; then
             echo "SUSFS 补丁应用失败，请检查补丁内容和路径！"
+            cat fs/namespace.c.rej || true
             exit 1
           fi
           cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
@@ -268,7 +261,7 @@ jobs:
         run: |
           cd kernel_workspace/kernel_platform
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
-          sudo sed -i 's/-4k/${{ inputs.KERNEL_SUFFIX }}/g' ./common/arch/arm64/configs/gki_defconfig
+          sudo sed -i 's/-4k/${{ github.event.inputs.KERNEL_SUFFIX }}/g' ./common/arch/arm64/configs/gki_defconfig
 
       - name: Add sched_ext
         if: ${{ inputs.enable_feature_z }}
@@ -280,11 +273,7 @@ jobs:
          cd common/kernel/sched
       - name: Set the kernel compilation time
         run: |
-          if [ "${{ inputs.KERNEL_TIME_MODE }}" = "自动获取" ]; then
-            echo "KERNEL_TIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S CST')" >> $GITHUB_ENV
-          else
-            echo "KERNEL_TIME=${{ inputs.KERNEL_TIME_CUSTOM }}" >> $GITHUB_ENV
-          fi
+          echo "KERNEL_TIME=${{ github.event.inputs.KERNEL_TIME }}" >> $GITHUB_ENV
          
       - name: Set Kernel build timestamp
         run: |
@@ -329,23 +318,23 @@ jobs:
           path: kernel_workspace/kernel_platform/dist/Image
       - name: Generate Release Description
         run: |
-          if [ "${{ inputs.enable_feature_x }}" = "true" ]; then
+          if [ "${{ github.event.inputs.enable_feature_x }}" = "true" ]; then
             kpm="已嵌入"
           else
             kpm="未嵌入"
           fi
-          if [ "${{ inputs.enable_feature_y }}" = "true" ]; then
+          if [ "${{ github.event.inputs.enable_feature_y }}" = "true" ]; then
             lz4kd="已嵌入"
           else
             lz4kd="未嵌入"
           fi
-          if [ "${{ inputs.enable_feature_z }}" = "true" ]; then
+          if [ "${{ github.event.inputs.enable_feature_z }}" = "true" ]; then
             fengchi="已嵌入"
           else
             fengchi="未嵌入"
           fi
           susfs="已嵌入"
-          FEIL="oneplus_13t"
+          FEIL="oneplus_ace5pro"
           desc="**SuKiSu 版本**: $KSUVER
               **内核型号**: $FEIL
               **KPM**: $kpm
