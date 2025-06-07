@@ -6,10 +6,18 @@ on:
         description: '内核名称修改'
         required: true
         default: '-酷安姜北尘'
-      KERNEL_TIME:
-        description: "内核构建日期更改(默认为原厂)"
+      KERNEL_TIME_MODE:
+        description: "编译时间模式（自动获取/自定义）"
         required: true
-        default: 'Tue Dec 17 23:36:49 UTC 2024'
+        default: '自动获取'
+        type: choice
+        options:
+          - 自动获取
+          - 自定义
+      KERNEL_TIME_CUSTOM:
+        description: "自定义编译时间(仅在自定义模式下生效，如 2025-06-04 12:00:00 CST)"
+        required: false
+        default: ''
       enable_feature_x:
         description: "是否启用kpm"
         required: false
@@ -273,7 +281,11 @@ jobs:
          cd common/kernel/sched
       - name: Set the kernel compilation time
         run: |
-          echo "KERNEL_TIME=${{ github.event.inputs.KERNEL_TIME }}" >> $GITHUB_ENV
+          if [ "${{ github.event.inputs.KERNEL_TIME_MODE }}" = "自动获取" ]; then
+            echo "KERNEL_TIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S CST')" >> $GITHUB_ENV
+          else
+            echo "KERNEL_TIME=${{ github.event.inputs.KERNEL_TIME_CUSTOM }}" >> $GITHUB_ENV
+          fi
          
       - name: Set Kernel build timestamp
         run: |
@@ -291,7 +303,7 @@ jobs:
 
       - name: Apply Linux Patch
         run: |
-          cd kernel_workspace/kernel_platform/dist
+          cd kernel_workspace/kernel_platform/common/out
           curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.11-beta/patch_linux
           chmod +x patch_linux
           ./patch_linux
