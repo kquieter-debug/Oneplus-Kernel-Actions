@@ -111,7 +111,7 @@ jobs:
           cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-          # lz4k
+          #lz4k
           cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux
           cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
           cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto
@@ -124,7 +124,6 @@ jobs:
           patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch
           if [ $? -ne 0 ]; then
             echo "SUSFS 补丁应用失败，请检查补丁内容和路径！"
-            cat fs/namespace.c.rej || true
             exit 1
           fi
           cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
