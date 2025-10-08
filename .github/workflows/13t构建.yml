@@ -1,13 +1,13 @@
-name: 一加13t构建 
+name: 一加pad 构建 
 on:
   workflow_dispatch:
     inputs:
       KERNEL_SUFFIX:
         description: '内核名称修改'
         required: true
-        default: '-酷安姜北尘'
+        default: '-Kquieter'
       KERNEL_TIME_MODE:
-        description: "编译时间模式（自动获取/自定义）"
+        description: "编译时间模式（Auto/自定义）"
         required: true
         default: '自动获取'
         type: choice
@@ -68,11 +68,6 @@ jobs:
           remove-haskell: 'true'
           remove-codeql: 'true'
           
-      - name: Configure Git
-        run: |
-         git config --global user.name "jiangbeichen"
-         git config --global user.email "2678115663@qq.com"
-
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt upgrade -y
@@ -84,13 +79,19 @@ jobs:
          chmod a+x ~/repo
          sudo mv ~/repo /usr/local/bin/repo
 
-      - name: Initialize repo and sync
-        run: |
-          mkdir kernel_workspace && cd kernel_workspace
-          repo init -u https://github.com/jiangbeichen233/kernel_manifest.git -b oneplus/sm8750 -m oneplus_13t.xml --depth=1
-          repo --trace sync -c -j$(nproc --all) --no-tags
-          rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
-          rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
+      - name: Build Kernel With Oplus Open kernel defconfig
+        uses: dabao1955/kernel_build_action@main
+        with:
+          kernel-url: https://github.com/kquieter-debug/android_kernel_oneplus_mt6897
+          kernel-dir: kernel-source
+          kernel-branch: oneplus/mt6897_v_15.0.0_oneplus_pad
+          config: defconfig
+          arch: arm64
+          aosp-gcc: true
+          aosp-clang: true
+          android-version: 14
+          aosp-clang-version: r383902
+          disable-lto: true
          
       - name: Set up SukiSU
         run: |
@@ -350,7 +351,7 @@ jobs:
               **风驰内核**: $fengchi
               **SUSFS**: $susfs
               **构建时间**: $KERNEL_TIME
-              **构建者**: 酷安by姜北尘"
+              **构建者**: Kquieter
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
           echo "$desc" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
