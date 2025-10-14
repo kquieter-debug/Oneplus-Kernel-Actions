@@ -58,6 +58,7 @@ jobs:
           key: ccache-${{ runner.os }}-${{ github.ref }}
           restore-keys: |
             ccache-${{ runner.os }}-
+            
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
         with:
@@ -79,20 +80,33 @@ jobs:
          chmod a+x ~/repo
          sudo mv ~/repo /usr/local/bin/repo
 
-      - name: Build Kernel With Oplus Open kernel defconfig
-        uses: dabao1955/kernel_build_action@main
-        with:
-          kernel-url: https://github.com/kquieter-debug/android_kernel_oneplus_mt6897
-          kernel-dir: kernel-source
-          kernel-branch: oneplus/mt6897_v_15.0.0_oneplus_pad
-          config: defconfig
-          arch: arm64
-          aosp-gcc: true
-          aosp-clang: true
-          android-version: 14
-          aosp-clang-version: r383902
-          disable-lto: true
+      - name: 初始化源码仓库
+        run: |
+          rm -rf kernel_workspace && mkdir kernel_workspace && cd kernel_workspace
+          echo "正在克隆源码仓库..."
+          git clone --depth=1 https://github.com/oppo-source/android_kernel_oppo_mt6897 common -b oppo/mt6897_v_15.0.0_oppopad3
          
+          # git clone --depth=1 https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8650 -b oneplus/"${{ github.event.inputs.basebranch }}" common
+          git clone https://github.com/Carl1984/oppo_oplus_realme_sm8650.git
+          cp ./oppo_oplus_realme_sm8650/patches/001-lz4.patch ./common/
+          cp ./oppo_oplus_realme_sm8650/patches/002-zstd.patch ./common/
+          
+          rm -rf ./common/drivers/soc/oplus/*
+          cp -r ./oppo_oplus_realme_sm8650/Vendor/* ./common/drivers/soc/oplus/
+          rm -rf ./common/kernel/locking/locking_main.h
+          cp ./oppo_oplus_realme_sm8650/patches/locking_main.h ./common/kernel/locking/
+          rm -rf ./common/kernel/locking/oplus_locking.c
+          cp ./oppo_oplus_realme_sm8650/patches/oplus_locking.c ./common/kernel/locking/
+          rm -rf ./common/kernel/locking/sa_common_struct.h
+          cp ./oppo_oplus_realme_sm8650/patches/sa_common_struct.h ./common/kernel/locking/
+          
+          echo "正在去除 ABI 保护 & 去除 dirty 后缀..."
+          rm common/android/abi_gki_protected_exports_* || true
+          for f in common/scripts/setlocalversion; do
+            sed -i 's/ -dirty//g' "$f"
+            sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
+          done
+
       - name: Set up SukiSU
         run: |
          cd kernel_workspace/kernel_platform
@@ -102,6 +116,7 @@ jobs:
          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
          export KSU_VERSION=$KSU_VERSION
          sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
+         
       - name: Set up susfs
         run: |
           cd kernel_workspace
@@ -127,6 +142,7 @@ jobs:
           cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
           patch -p1 -F 3 < syscall_hooks.patch
           echo "完成"
+          
       - name: Apply HMBird GKI patch
         run: |
          cd kernel_workspace/kernel_platform/common/drivers
@@ -206,7 +222,8 @@ jobs:
          fi
          cd ../../../
          git add -A
-         git commit -m "Add HMBird GKI patch" || true         
+         git commit -m "Add HMBird GKI patch" || true
+         
       - name: Apply lz4kd Patches
         if: ${{ inputs.enable_feature_y }}
         run: |
@@ -276,6 +293,7 @@ jobs:
          cp -r ./sched_ext/* ./common/kernel/sched
          rm -rf ./sched_ext/.git
          cd common/kernel/sched
+         
       - name: Set the kernel compilation time
         run: |
           if [ "${{ github.event.inputs.KERNEL_TIME_MODE }}" = "自动获取" ]; then
@@ -325,6 +343,7 @@ jobs:
         with:
           name: Image_SuKiSu_${{ env.KSUVER }}_oneplus_13t
           path: kernel_workspace/kernel_platform/dist/Image
+          
       - name: Generate Release Description
         run: |
           if [ "${{ github.event.inputs.enable_feature_x }}" = "true" ]; then
@@ -355,6 +374,7 @@ jobs:
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
           echo "$desc" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
+          
       - name: Get formatted date
         id: formatted_date
         run: |
@@ -375,3 +395,4 @@ jobs:
           files: SuKiSu_${{ env.KSUVER }}_oneplus_13t_${{ steps.formatted_date.outputs.formatted }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
