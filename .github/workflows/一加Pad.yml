@@ -84,18 +84,71 @@ jobs:
           echo "正在克隆源码仓库..."
           git clone --depth=1 https://github.com/oppo-source/android_kernel_oppo_mt6897 common -b oppo/mt6897_v_15.0.0_oppopad3
           
+          echo "正在克隆补丁仓库..."
           git clone https://github.com/Carl1984/oppo_oplus_realme_sm8650.git
-          cp ./oppo_oplus_realme_sm8650/patches/001-lz4.patch ./common/
-          cp ./oppo_oplus_realme_sm8650/patches/002-zstd.patch ./common/
           
-          rm -rf ./common/drivers/soc/oplus/*
-          cp -r ./oppo_oplus_realme_sm8650/Vendor/* ./common/drivers/soc/oplus/
-          rm -rf ./common/kernel/locking/locking_main.h
-          cp ./oppo_oplus_realme_sm8650/patches/locking_main.h ./common/kernel/locking/
-          rm -rf ./common/kernel/locking/oplus_locking.c
-          cp ./oppo_oplus_realme_sm8650/patches/oplus_locking.c ./common/kernel/locking/
-          rm -rf ./common/kernel/locking/sa_common_struct.h
-          cp ./oppo_oplus_realme_sm8650/patches/sa_common_struct.h ./common/kernel/locking/
+          # 检查补丁目录结构并复制文件
+          echo "检查补丁目录结构..."
+          find ./oppo_oplus_realme_sm8650 -type f -name "*.patch" | head -10
+          ls -la ./oppo_oplus_realme_sm8650/
+          
+          # 尝试不同的补丁目录路径
+          if [ -d "./oppo_oplus_realme_sm8650/patches" ]; then
+            echo "使用 patches 目录"
+            PATCH_DIR="./oppo_oplus_realme_sm8650/patches"
+          elif [ -d "./oppo_oplus_realme_sm8650/patch" ]; then
+            echo "使用 patch 目录"
+            PATCH_DIR="./oppo_oplus_realme_sm8650/patch"
+          else
+            echo "在根目录中查找补丁文件"
+            PATCH_DIR="./oppo_oplus_realme_sm8650"
+          fi
+          
+          # 复制补丁文件（如果存在）
+          if [ -f "$PATCH_DIR/001-lz4.patch" ]; then
+            cp "$PATCH_DIR/001-lz4.patch" ./common/
+          else
+            echo "警告: 001-lz4.patch 未找到，跳过"
+          fi
+          
+          if [ -f "$PATCH_DIR/002-zstd.patch" ]; then
+            cp "$PATCH_DIR/002-zstd.patch" ./common/
+          else
+            echo "警告: 002-zstd.patch 未找到，跳过"
+          fi
+          
+          # 复制 Vendor 文件
+          if [ -d "./oppo_oplus_realme_sm8650/Vendor" ]; then
+            rm -rf ./common/drivers/soc/oplus/*
+            cp -r ./oppo_oplus_realme_sm8650/Vendor/* ./common/drivers/soc/oplus/
+          else
+            echo "警告: Vendor 目录未找到"
+          fi
+          
+          # 复制锁定相关文件
+          if [ -f "./oppo_oplus_realme_sm8650/patches/locking_main.h" ]; then
+            rm -rf ./common/kernel/locking/locking_main.h
+            cp ./oppo_oplus_realme_sm8650/patches/locking_main.h ./common/kernel/locking/
+          elif [ -f "./oppo_oplus_realme_sm8650/patch/locking_main.h" ]; then
+            rm -rf ./common/kernel/locking/locking_main.h
+            cp ./oppo_oplus_realme_sm8650/patch/locking_main.h ./common/kernel/locking/
+          fi
+          
+          if [ -f "./oppo_oplus_realme_sm8650/patches/oplus_locking.c" ]; then
+            rm -rf ./common/kernel/locking/oplus_locking.c
+            cp ./oppo_oplus_realme_sm8650/patches/oplus_locking.c ./common/kernel/locking/
+          elif [ -f "./oppo_oplus_realme_sm8650/patch/oplus_locking.c" ]; then
+            rm -rf ./common/kernel/locking/oplus_locking.c
+            cp ./oppo_oplus_realme_sm8650/patch/oplus_locking.c ./common/kernel/locking/
+          fi
+          
+          if [ -f "./oppo_oplus_realme_sm8650/patches/sa_common_struct.h" ]; then
+            rm -rf ./common/kernel/locking/sa_common_struct.h
+            cp ./oppo_oplus_realme_sm8650/patches/sa_common_struct.h ./common/kernel/locking/
+          elif [ -f "./oppo_oplus_realme_sm8650/patch/sa_common_struct.h" ]; then
+            rm -rf ./common/kernel/locking/sa_common_struct.h
+            cp ./oppo_oplus_realme_sm8650/patch/sa_common_struct.h ./common/kernel/locking/
+          fi
           
           echo "正在去除 ABI 保护 & 去除 dirty 后缀..."
           rm common/android/abi_gki_protected_exports_* || true
