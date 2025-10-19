@@ -85,27 +85,32 @@ jobs:
           find ./oppo_oplus_realme_sm8650 -type f -name "*.patch" | head -10
           ls -la ./oppo_oplus_realme_sm8650/
           
-          # 尝试不同的补丁目录路径
+          # 尝试不同的补丁目录路径（新增 zram_patch 目录识别，适配日志中补丁实际位置）
           if [ -d "./oppo_oplus_realme_sm8650/patches" ]; then
             echo "使用 patches 目录"
             PATCH_DIR="./oppo_oplus_realme_sm8650/patches"
           elif [ -d "./oppo_oplus_realme_sm8650/patch" ]; then
             echo "使用 patch 目录"
             PATCH_DIR="./oppo_oplus_realme_sm8650/patch"
+          elif [ -d "./oppo_oplus_realme_sm8650/zram_patch" ]; then
+            echo "使用 zram_patch 目录（适配日志中补丁位置）"
+            PATCH_DIR="./oppo_oplus_realme_sm8650/zram_patch"
           else
             echo "在根目录中查找补丁文件"
             PATCH_DIR="./oppo_oplus_realme_sm8650"
           fi
           
-          # 复制补丁文件（如果存在）
+          # 复制补丁文件（修复日志中补丁未找到的警告）
           if [ -f "$PATCH_DIR/001-lz4.patch" ]; then
             cp "$PATCH_DIR/001-lz4.patch" ./common/
+            echo "001-lz4.patch 复制成功"
           else
             echo "警告: 001-lz4.patch 未找到，跳过"
           fi
           
           if [ -f "$PATCH_DIR/002-zstd.patch" ]; then
             cp "$PATCH_DIR/002-zstd.patch" ./common/
+            echo "002-zstd.patch 复制成功"
           else
             echo "警告: 002-zstd.patch 未找到，跳过"
           fi
@@ -114,33 +119,52 @@ jobs:
           if [ -d "./oppo_oplus_realme_sm8650/Vendor" ]; then
             rm -rf ./common/drivers/soc/oplus/*
             cp -r ./oppo_oplus_realme_sm8650/Vendor/* ./common/drivers/soc/oplus/
+            echo "Vendor 文件复制成功"
           else
             echo "警告: Vendor 目录未找到"
           fi
           
           # 复制锁定相关文件
-          if [ -f "./oppo_oplus_realme_sm8650/patches/locking_main.h" ]; then
+          if [ -f "$PATCH_DIR/locking_main.h" ]; then
+            rm -rf ./common/kernel/locking/locking_main.h
+            cp "$PATCH_DIR/locking_main.h" ./common/kernel/locking/
+            echo "locking_main.h 复制成功"
+          elif [ -f "./oppo_oplus_realme_sm8650/patches/locking_main.h" ]; then
             rm -rf ./common/kernel/locking/locking_main.h
             cp ./oppo_oplus_realme_sm8650/patches/locking_main.h ./common/kernel/locking/
           elif [ -f "./oppo_oplus_realme_sm8650/patch/locking_main.h" ]; then
             rm -rf ./common/kernel/locking/locking_main.h
             cp ./oppo_oplus_realme_sm8650/patch/locking_main.h ./common/kernel/locking/
+          else
+            echo "警告: locking_main.h 未找到，跳过"
           fi
           
-          if [ -f "./oppo_oplus_realme_sm8650/patches/oplus_locking.c" ]; then
+          if [ -f "$PATCH_DIR/oplus_locking.c" ]; then
+            rm -rf ./common/kernel/locking/oplus_locking.c
+            cp "$PATCH_DIR/oplus_locking.c" ./common/kernel/locking/
+            echo "oplus_locking.c 复制成功"
+          elif [ -f "./oppo_oplus_realme_sm8650/patches/oplus_locking.c" ]; then
             rm -rf ./common/kernel/locking/oplus_locking.c
             cp ./oppo_oplus_realme_sm8650/patches/oplus_locking.c ./common/kernel/locking/
           elif [ -f "./oppo_oplus_realme_sm8650/patch/oplus_locking.c" ]; then
             rm -rf ./common/kernel/locking/oplus_locking.c
             cp ./oppo_oplus_realme_sm8650/patch/oplus_locking.c ./common/kernel/locking/
+          else
+            echo "警告: oplus_locking.c 未找到，跳过"
           fi
           
-          if [ -f "./oppo_oplus_realme_sm8650/patches/sa_common_struct.h" ]; then
+          if [ -f "$PATCH_DIR/sa_common_struct.h" ]; then
+            rm -rf ./common/kernel/locking/sa_common_struct.h
+            cp "$PATCH_DIR/sa_common_struct.h" ./common/kernel/locking/
+            echo "sa_common_struct.h 复制成功"
+          elif [ -f "./oppo_oplus_realme_sm8650/patches/sa_common_struct.h" ]; then
             rm -rf ./common/kernel/locking/sa_common_struct.h
             cp ./oppo_oplus_realme_sm8650/patches/sa_common_struct.h ./common/kernel/locking/
           elif [ -f "./oppo_oplus_realme_sm8650/patch/sa_common_struct.h" ]; then
             rm -rf ./common/kernel/locking/sa_common_struct.h
             cp ./oppo_oplus_realme_sm8650/patch/sa_common_struct.h ./common/kernel/locking/
+          else
+            echo "警告: sa_common_struct.h 未找到，跳过"
           fi
           
           echo "正在去除 ABI 保护 & 去除 dirty 后缀..."
@@ -167,6 +191,7 @@ jobs:
             KSU_VERSION=$(expr $(git rev-list --count HEAD) "+" 10606)
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
             sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
+            echo "SukiSU 版本设置完成：$KSU_VERSION"
           else
             echo "KernelSU directory not found, skipping version setup"
             echo "KSUVER=10606" >> $GITHUB_ENV
@@ -204,11 +229,14 @@ jobs:
           fi
           
           echo "susfs setup completed"
-      # ===================== 关键修改：修复 Git 仓库目录问题 =====================
+      # ===================== 核心修复：修正目录层级 + 显式确认 Git 仓库 =====================
       - name: Apply HMBird GKI patch
         run: |
+          # 1. 显式进入 common/drivers 目录（避免工作目录歧义）
           cd kernel_workspace/common/drivers
-          # 创建 hmbird_patch.c 补丁文件
+          echo "当前工作目录（创建补丁前）: $(pwd)"
+          
+          # 2. 创建 hmbird_patch.c 补丁文件
           cat << 'EOF' > hmbird_patch.c
           #include <linux/init.h>
           #include <linux/module.h>
@@ -274,15 +302,26 @@ jobs:
           MODULE_AUTHOR("reigadegr");
           MODULE_DESCRIPTION("Forcefully convert HMBIRD_OGKI to HMBIRD_GKI.");
           EOF
-          # 修改 drivers 目录的 Makefile，添加补丁编译
+          
+          # 3. 修改 drivers 目录的 Makefile，添加补丁编译
           if ! grep -q "hmbird_patch.o" Makefile; then
             echo "obj-y += hmbird_patch.o" >> Makefile
+            echo "drivers/Makefile 已添加 hmbird_patch.o"
           fi
-          # 关键修改：从 drivers 目录回到 common 目录（Git 仓库目录），而非 kernel_workspace
-          cd ../../
-          # 在 common 目录执行 Git 提交（common 是克隆的源码仓库，自带 Git 环境）
-          git add -A
-          git commit -m "Add HMBird GKI patch" || true
+          
+          # 4. 核心修复：仅向上一级回到 common 目录（Git 仓库根目录）
+          cd ..
+          echo "当前工作目录（准备 Git 操作）: $(pwd)"
+          
+          # 5. 显式验证当前目录是否为 Git 仓库（避免歧义）
+          if [ -d ".git" ]; then
+            echo "确认当前目录为 Git 仓库，执行提交操作"
+            git add -A
+            git commit -m "Add HMBird GKI patch" || echo "Git 提交无变更，跳过"
+          else
+            echo "错误：当前目录不是 Git 仓库，终止操作"
+            exit 1
+          fi
       # ========================================================================
       - name: Apply lz4kd Patches
         if: ${{ inputs.enable_feature_y }}
