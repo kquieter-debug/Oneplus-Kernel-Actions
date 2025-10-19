@@ -188,10 +188,18 @@ jobs:
           
           if [ -d "./KernelSU" ]; then
             cd ./KernelSU
-            if ! git show-ref --verify --quiet refs/heads/susfs-dev; then
-              git fetch origin susfs-dev:refs/heads/susfs-dev
-              git checkout susfs-dev
+            # 核心修复：先检查远程是否存在 susfs-dev 分支，不存在则跳过切换
+            if git ls-remote --heads origin susfs-dev | grep -q "susfs-dev"; then
+              # 远程存在该分支，执行 fetch 和 checkout
+              if ! git show-ref --verify --quiet refs/heads/susfs-dev; then
+                git fetch origin susfs-dev:refs/heads/susfs-dev
+                git checkout susfs-dev
+              fi
+            else
+              # 远程不存在该分支，输出警告并使用当前分支
+              echo "警告：KernelSU 远程仓库无 susfs-dev 分支，使用当前分支计算版本"
             fi
+            # 版本计算逻辑不变
             KSU_VERSION=$(expr $(git rev-list --count HEAD) "+" 10606)
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
             sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
@@ -550,4 +558,5 @@ jobs:
             kernel_workspace/dist/Image
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
