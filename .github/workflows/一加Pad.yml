@@ -33,10 +33,8 @@ on:
         required: false
         default: false
         type: boolean
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -47,7 +45,6 @@ jobs:
       CCACHE_DIR: /home/runner/.ccache
       CCACHE_MAXSIZE: 8G
       CCACHE_COMPRESS: "true"
-
     steps:
       - name: Restore ccache
         uses: actions/cache@v3
@@ -56,7 +53,6 @@ jobs:
           key: ccache-${{ runner.os }}-${{ github.ref }}
           restore-keys: |
             ccache-${{ runner.os }}-
-
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
         with:
@@ -66,18 +62,15 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
-
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt upgrade -y
           sudo apt install -y python3 git curl ccache libelf-dev elfutils llvm clang lld flex bison bc build-essential
-
       - name: Install repo tool
         run: |
           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
           chmod a+x ~/repo
           sudo mv ~/repo /usr/local/bin/repo
-
       - name: 初始化源码仓库
         run: |
           rm -rf kernel_workspace && mkdir kernel_workspace && cd kernel_workspace
@@ -156,7 +149,6 @@ jobs:
             [ -f "$f" ] && sed -i 's/ -dirty//g' "$f"
             [ -f "$f" ] && sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
           done
-
       - name: Verify source code
         run: |
           cd kernel_workspace
@@ -165,7 +157,6 @@ jobs:
             exit 1
           fi
           echo "Source code verified successfully"
-
       - name: Set up SukiSU
         run: |
           cd kernel_workspace/common
@@ -180,13 +171,11 @@ jobs:
             echo "KernelSU directory not found, skipping version setup"
             echo "KSUVER=10606" >> $GITHUB_ENV
           fi
-
       - name: Set up susfs
         run: |
           cd kernel_workspace
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android15-6.6
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
-
           cd common
           
           # 检查并应用 susfs patch
@@ -197,7 +186,6 @@ jobs:
             
             sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-android15-6.6.patch
             sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-android15-6.6.patch
-
             patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || echo "Patch may have already been applied"
           fi
           
@@ -216,41 +204,37 @@ jobs:
           fi
           
           echo "susfs setup completed"
-
+      # ===================== 关键修改：修复 Git 仓库目录问题 =====================
       - name: Apply HMBird GKI patch
         run: |
           cd kernel_workspace/common/drivers
+          # 创建 hmbird_patch.c 补丁文件
           cat << 'EOF' > hmbird_patch.c
           #include <linux/init.h>
           #include <linux/module.h>
           #include <linux/of.h>
           #include <linux/slab.h>
           #include <linux/string.h>
-
           static int __init hmbird_patch_init(void)
           {
               struct device_node *ver_np;
               const char *type;
               int ret;
-
               ver_np = of_find_node_by_path("/soc/oplus,hmbird/version_type");
               if (!ver_np) {
                    pr_info("hmbird_patch: version_type node not found\n");
                    return 0;
               }
-
               ret = of_property_read_string(ver_np, "type", &type);
               if (ret) {
                    pr_info("hmbird_patch: type property not found\n");
                    of_node_put(ver_np);
                    return 0;
               }
-
               if (strcmp(type, "HMBIRD_OGKI")) {
                    of_node_put(ver_np);
                    return 0;
               }
-
               struct property *prop = of_find_property(ver_np, "type", NULL);
               if (prop) {
                    struct property *new_prop = kmalloc(sizeof(*prop), GFP_KERNEL);
@@ -269,7 +253,6 @@ jobs:
              }
              strcpy(new_prop->value, "HMBIRD_GKI");
              new_prop->length = strlen("HMBIRD_GKI") + 1;
-
              if (of_remove_property(ver_np, prop) != 0) {
                   pr_info("hmbird_patch: of_remove_property failed\n");
                   return 0;
@@ -291,13 +274,16 @@ jobs:
           MODULE_AUTHOR("reigadegr");
           MODULE_DESCRIPTION("Forcefully convert HMBIRD_OGKI to HMBIRD_GKI.");
           EOF
+          # 修改 drivers 目录的 Makefile，添加补丁编译
           if ! grep -q "hmbird_patch.o" Makefile; then
-          echo "obj-y += hmbird_patch.o" >> Makefile
+            echo "obj-y += hmbird_patch.o" >> Makefile
           fi
-          cd ../../../
+          # 关键修改：从 drivers 目录回到 common 目录（Git 仓库目录），而非 kernel_workspace
+          cd ../../
+          # 在 common 目录执行 Git 提交（common 是克隆的源码仓库，自带 Git 环境）
           git add -A
           git commit -m "Add HMBird GKI patch" || true
-
+      # ========================================================================
       - name: Apply lz4kd Patches
         if: ${{ inputs.enable_feature_y }}
         run: |
@@ -308,12 +294,10 @@ jobs:
           else
             echo "lz4kd patch file not found"
           fi
-
       - name: Add SUSFS Configuration Settings
         run: |
           cd kernel_workspace/common
           echo "CONFIG_KSU=y" >> ./arch/arm64/configs/gki_defconfig
-
           # Add VFS configuration settings
           echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> ./arch/arm64/configs/gki_defconfig
@@ -341,27 +325,24 @@ jobs:
           echo "CONFIG_CRYPTO_842=y" >> ./arch/arm64/configs/gki_defconfig
           echo "CONFIG_LOCALVERSION_AUTO=n" >> ./arch/arm64/configs/gki_defconfig
           
-          #Remove check_defconfig
+          # Remove check_defconfig
           if [ -f "./build.config.gki" ]; then
             sudo sed -i 's/check_defconfig//' ./build.config.gki
           fi
           
           git add -A && git commit -a -m "Add SUSFS configuration" || true
-
       - name: Add KPM Configuration Settings
         if: ${{ inputs.enable_feature_x }}
         run: |
           cd kernel_workspace/common
           echo "CONFIG_KPM=y" >> ./arch/arm64/configs/gki_defconfig
           git add -A && git commit -a -m "Add KPM configuration" || true
-
       - name: Add make name
         run: |
           cd kernel_workspace/common
           sed -i 's/${scm_version}//' ./scripts/setlocalversion
           sed -i "s/-4k/${{ github.event.inputs.KERNEL_SUFFIX }}/g" ./arch/arm64/configs/gki_defconfig
           git add -A && git commit -a -m "Add kernel suffix" || true
-
       - name: Add sched_ext
         if: ${{ inputs.enable_feature_z }}
         run: |
@@ -371,7 +352,6 @@ jobs:
           rm -rf ./sched_ext
           cd common/kernel/sched
           git add -A && git commit -a -m "Add sched_ext" || true
-
       - name: Set the kernel compilation time
         run: |
           if [ "${{ github.event.inputs.KERNEL_TIME_MODE }}" = "自动获取" ]; then
@@ -383,12 +363,10 @@ jobs:
               echo "KERNEL_TIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S CST')" >> $GITHUB_ENV
             fi
           fi
-
       - name: Set Kernel build timestamp
         run: |
           export SOURCE_DATE_EPOCH=$(date -d "${{ env.KERNEL_TIME }}" +%s)
           echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >> $GITHUB_ENV
-
       - name: Build Kernel
         run: |
           export KBUILD_BUILD_TIMESTAMP="${{ env.KERNEL_TIME }}"
@@ -417,7 +395,6 @@ jobs:
             ls -la out/arch/arm64/boot/
             exit 1
           fi
-
       - name: Apply Linux Patch
         run: |
           cd kernel_workspace/common/out
@@ -431,7 +408,6 @@ jobs:
           else
             echo "oImage not found after patching"
           fi
-
       - name: Prepare AnyKernel3
         run: |
           cd kernel_workspace
@@ -445,7 +421,6 @@ jobs:
             echo "Kernel Image not found in dist/"
             exit 1
           fi
-
       - name: Generate Release Description
         run: |
           if [ "${{ github.event.inputs.enable_feature_x }}" = "true" ]; then
@@ -481,37 +456,31 @@ jobs:
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
           cat release_body.md >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-
       - name: Get formatted date
         id: formatted_date
         run: |
           DATE=$(date +'%y%m%d-%H%M')
           echo "formatted=$DATE" >> $GITHUB_OUTPUT
-
       - name: Zip AnyKernel3
         run: |
           cd kernel_workspace
           zip -r "SuKiSu_${KSUVER}_oneplus_pad_${{ steps.formatted_date.outputs.formatted }}.zip" AnyKernel3/*
           echo "Zip file created: SuKiSu_${KSUVER}_oneplus_pad_${{ steps.formatted_date.outputs.formatted }}.zip"
-
       - name: Upload AnyKernel3 Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SuKiSu_${{ env.KSUVER }}_oneplus_pad
           path: kernel_workspace/AnyKernel3/*
-
       - name: Upload Image Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Image_SuKiSu_${{ env.KSUVER }}_oneplus_pad
           path: kernel_workspace/dist/Image
-
       - name: Upload Zip Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SuKiSu_${{ env.KSUVER }}_oneplus_pad_${{ steps.formatted_date.outputs.formatted }}.zip
           path: kernel_workspace/SuKiSu_${{ env.KSUVER }}_oneplus_pad_${{ steps.formatted_date.outputs.formatted }}.zip
-
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'workflow_dispatch'
