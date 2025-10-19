@@ -41,7 +41,7 @@ jobs:
     env:
       CCACHE_COMPILERCHECK: content
       CCACHE_NOHASHDIR: "true"
-      CCACHE_HARDLINK: "false"
+      CCACHE_NOHARDLINK: "true"
       CCACHE_DIR: /home/runner/.ccache
       CCACHE_MAXSIZE: 8G
       CCACHE_COMPRESS: "true"
@@ -188,6 +188,10 @@ jobs:
           
           if [ -d "./KernelSU" ]; then
             cd ./KernelSU
+            if ! git show-ref --verify --quiet refs/heads/susfs-dev; then
+              git fetch origin susfs-dev:refs/heads/susfs-dev
+              git checkout susfs-dev
+            fi
             KSU_VERSION=$(expr $(git rev-list --count HEAD) "+" 10606)
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
             sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
@@ -196,6 +200,14 @@ jobs:
             echo "KernelSU directory not found, skipping version setup"
             echo "KSUVER=10606" >> $GITHUB_ENV
           fi
+      - name: Ignore embedded Git repo
+        run: |
+            cd kernel_workspace/common
+            if ! grep -q "KernelSU/" .gitignore; then
+              echo "KernelSU/" >> .gitignore
+              git add .gitignore
+              git commit -m "Ignore KernelSU embedded repo"
+            fi
       - name: Set up susfs
         run: |
           cd kernel_workspace
@@ -313,6 +325,10 @@ jobs:
           cd ..
           echo "当前工作目录（准备 Git 操作）: $(pwd)"
           
+          # 新增：配置 Git 本地用户身份（解决 Author identity unknown 错误）
+          git config --local user.name "Kernel Builder"
+          git config --local user.email "builder@example.com"
+
           # 5. 显式验证当前目录是否为 Git 仓库（避免歧义）
           if [ -d ".git" ]; then
             echo "确认当前目录为 Git 仓库，执行提交操作"
@@ -327,11 +343,13 @@ jobs:
         if: ${{ inputs.enable_feature_y }}
         run: |
           cd kernel_workspace/common
-          if [ -f "../../SukiSU_patch/other/zram/zram_patch/6.6/lz4kd.patch" ]; then
-            cp ../../SukiSU_patch/other/zram/zram_patch/6.6/lz4kd.patch ./
+          # 修正补丁路径
+          if [ -f "../oppo_oplus_realme_sm8650/zram_patch/lz4kd.patch" ]; then
+            cp ../oppo_oplus_realme_sm8650/zram_patch/lz4kd.patch ./
             patch -p1 -F 3 < lz4kd.patch || echo "lz4kd patch may have failed"
           else
             echo "lz4kd patch file not found"
+            # 若需强制启用，可添加 exit 1 阻断
           fi
       - name: Add SUSFS Configuration Settings
         run: |
@@ -532,3 +550,4 @@ jobs:
             kernel_workspace/dist/Image
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
